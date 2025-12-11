@@ -51,11 +51,11 @@ author: Daniel Grauer
     [VarDef,GoZProjectsPath,""]
     [VarDef, GoZBrushPath, ""]
 	[If,[ZBrushInfo,6],//is MacOS
-	 	[If,[StrFind,"Shared",publicPath]>-1,
-		 	[VarSet,GoZProjectsPath,[StrExtract,publicPath,0,([StrFind,"Shared",publicPath]+6)]]
-		 	[VarSet,GoZProjectsPath,[StrMerge,GoZProjectsPath,"Pixologic/GoZProjects/Default/"]]
+	 	[If,[StrFind,"Users",publicPath]>-1,
+		 	[VarSet,GoZProjectsPath,[StrExtract,publicPath,0,([StrFind,"Users",publicPath]+5)]]
+		 	[VarSet,GoZProjectsPath,[StrMerge,GoZProjectsPath,"Shared/Pixologic/GoZProjects/Default/"]]
 
-		 	[VarSet,GoZBrushPath,[StrExtract,publicPath,0,([StrFind,"Shared",publicPath]+6)]]
+		 	[VarSet,GoZBrushPath,[StrExtract,publicPath,0,([StrFind,"Users",publicPath]+5)]]
 		 	[VarSet,GoZBrushPath,[StrMerge,GoZBrushPath,"Pixologic/GoZBrush/"]]
 
             //[Note,[StrMerge, "\nThe GoZ Projects path is: \n    ", GoZProjectsPath],,reportDuration]
@@ -65,17 +65,17 @@ author: Daniel Grauer
 	 	//this needs to be removed if passing paths to dynamic libraries etc. - see GetFullPath routine above
 	 	
          ,//else Windows
-		 [If,[StrFind,"Documents",publicPath]>-1,
-		 	[VarSet,GoZProjectsPath,[StrExtract,publicPath,0,([StrFind,"Documents",publicPath]-1)]]
-		 	[VarSet,GoZProjectsPath,[StrMerge,GoZProjectsPath,"Pixologic/GoZProjects/Default/"]]
+		 [If,[StrFind,"Users",publicPath]>-1,
+		 	[VarSet,GoZProjectsPath,[StrExtract,publicPath,0,([StrFind,"Users",publicPath]+5)]]
+		 	[VarSet,GoZProjectsPath,[StrMerge,GoZProjectsPath,"Public/Pixologic/GoZProjects/Default/"]]
 		 	[RoutineCall,AdjustPath,GoZProjectsPath]//just as Notes don't display backslashes!
 
-		 	[VarSet,GoZBrushPath,[StrExtract,publicPath,0,([StrFind,"Documents",publicPath]-1)]]
-		 	[VarSet,GoZBrushPath,[StrMerge,GoZBrushPath,"Pixologic/GoZBrush/"]]
+		 	[VarSet,GoZBrushPath,[StrExtract,publicPath,0,([StrFind,"Users",publicPath]+5)]]
+		 	[VarSet,GoZBrushPath,[StrMerge,GoZBrushPath,"Public/Pixologic/GoZBrush/"]]
 		 	[RoutineCall,AdjustPath,GoZBrushPath]//just as Notes don't display backslashes!
 
-            //[Note,[StrMerge, "\nThe GoZ Projects path is: \n    ", GoZProjectsPath],,reportDuration]
-            //[Note,[StrMerge, "\nThe GoZ objects list path is: \n    ", GoZBrushPath],,reportDuration]
+            [Note,[StrMerge, "\nThe GoZ Projects path is: \n    ", GoZProjectsPath],,reportDuration]
+            [Note,[StrMerge, "\nThe GoZ objects list path is: \n    ", GoZBrushPath],,reportDuration]
 		 ]
 	]
 
