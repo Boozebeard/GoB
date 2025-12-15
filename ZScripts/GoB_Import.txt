@@ -1,12 +1,28 @@
-/*
-name: GoB_Import.zsc 
-description: Zbrush script for Blender GoB addon
-tracker_url: https://github.com/JoseConseco/GoB
-author: Daniel Grauer
-*/
+﻿//ZFileUtils test zscript for ZBrush 2021 by Marcus Civis & Xavier Durand - updated November 2020
+//The ZFileUtils64.dll and ZFileUtils.lib 
+//are provided 'as is' with no warranty of any kind - use at your own risk!
+
+//load this file through the ZScript:Load button
+//a new "ZFileUtilsTests" sub-palette will appear in the Zplugin pallette
+
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+//~~~VARIABLES
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+[VarDef,isMac,0]//do we have a Mac or PC
+[VarDef,Zvers,0]//ZBrush version
+[VarDef,dllPath,""]//plugin DLL path
+[VarDef,dllVersion,0]//plugin DLL version
+[VarDef,err,0]//standard error
+
+[VarDef, folderPath,""]
+[VarDef, GoZPath,""]
+[VarDef, defaultPath, "C:/Users/Public/Pixologic"]
+[VarDef, dafaultPathMac,"Users/Shared/Pixologic"]
 
 [VarDef,GoBImport,1]        
-[VarDef,reportDuration,-1]      //Display Duration (in seconds) (0:wait for user action(default), -1:combine with next note command),
+[VarDef,reportDuration,0]      //Display Duration (in seconds) (0:wait for user action(default), -1:combine with next note command),
 [VarDef,showFinalReport,0]      // Final Report (1: show, 0 Hide)
 [VarDef,finalReportreportDuration,100] //Display Duration (in seconds) (0:wait for user action(default), -1:combine with next note command),
 [VarDef,maxSubtools,999]  
@@ -22,6 +38,130 @@ author: Daniel Grauer
         6: gozProjectPath,
     */
 
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+//~~~ROUTINES
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+//The CheckSystem routine is a standard routine to make sure everything is as it should be. 
+//Call it whenever the plugin is reloaded
+[RoutineDef, CheckSystem,	
+	//check ZBrush version
+	[VarSet,Zvers,[ZBrushInfo,0]]
+	[If,[Val,Zvers] >= 2021.0,,		
+		[Note,"\Cff9923This zscript\Cffffff is not designed for this version of \Cff9923ZBrush\Cffffff.",,3,4737096,,300]
+		[Exit]
+	]	
+	[VarSet,isMac, [ZBrushInfo,6]]	//check Mac or PC
+	// Make sure we have the dll and set its path
+	[If,[ZBrushInfo,16]==64,//64 bit
+		[If,isMac,
+			//use the path below for testing only			
+			//[VarSet,dllPath,"MyPluginData/ZFileUtils.lib"]	
+			//use the path below for installed plugins
+			[VarSet,dllPath,"ZBRUSH_ZSTARTUP/ZPlugs64/MyPluginData/ZFileUtils.lib"]						
+			,	
+			//use the path below for testing only	
+			[VarSet,dllPath,"MyPluginData\ZFileUtils64.dll"]
+			//use the path below for installed plugins
+			//[VarSet,dllPath,"ZBRUSH_ZSTARTUP\ZPlugs64\MyPluginData\ZFileUtils64.dll"]		
+		]
+	,//else 32 bit - no longer supported
+		[Note,"\Cff9923This zscript\Cffffff is not designed for this version of \Cff9923ZBrush\Cffffff.",,3,4737096,,300]
+		[Exit]
+	]
+	[If, [FileExists, [Var,dllPath]],
+		//check that correct version
+		[VarSet, dllVersion, [FileExecute, [Var,dllPath], Version]]
+		[If, [Val,dllVersion] >= 8.0,//dll version
+			//OK
+			,//else earlier version			
+			[Note,"\Cff9923Note :\Cc0c0c0 The \Cff9923 ZFileUtils plugin \CffffffDLL\Cc0c0c0 is an earlier version which does not support this plugin.  Please install correct version."]
+			[Exit]
+		]			
+	, // else no DLL.
+		[Note,"\Cff9923Note :\Cc0c0c0 The \Cff9923 ZFileUtils plugin \CffffffDLL\Cc0c0c0 could not be found at the correct location.  Please re-install the plugin, making sure the relevant files and folders are in the \CffffffZStartup/ZPlugs\Cc0c0c0 folder."]
+		[Exit]
+	]
+]//end routine
+
+//call routine here to ensure it's called every time plugin loaded
+[RoutineCall, CheckSystem]
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+//~~~Folder Path Setup
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+//Loads saved path from settings file, or sets default 
+[RoutineDef, SetPath,
+	[VarSet, fileExists,[FileExists,"GoB_Import_Settings.svr"]]
+	[If, fileExists,
+		[VarLoad, folderPath, "GoB_Import_Settings.svr"]
+		[VarSet, GoZPath, folderPath]
+		,
+		[If, isMac,
+			[VarSet, GoZPath, defaultPathMac]
+			,
+			[VarSet, GoZPath, defaultPath]
+		]
+	]
+]
+[RoutineCall, SetPath]
+
+[RoutineDef, ChooseFolder,
+	//create memblock to get the path
+	[If,[MemGetSize,MC_FolderPath],,
+    [MemCreate,MC_FolderPath,256,0]    
+  ]
+  [VarSet,err,[FileExecute, [Var,dllPath],ChooseFolder,,,MC_FolderPath]]
+  [If,err,
+  	[Note,err]//function will return -1 if no folder chosen
+  	,
+	  //copy path from memblock to variable
+	  [MemReadString,MC_FolderPath,folderPath,0,1]
+	  //show the selected folder path
+	  [Note,folderPath]//Notes do not display backslashes
+	  //*** when using the path remember to append a slash before the file name!***
+	  //*** for example:
+	  //[VarSet,fileName,"My_Model.ztl"]
+	  //[FileNameSetNext,[StrMerge,folderPath,"/",fileName]]
+	]
+  [varSave, folderPath, "GoB_Import_Settings.svr"]
+  [MemDelete,MC_FolderPath]
+]
+
+//Checks the folder path is valid, if it is not asks user to choose the correct folder
+[RoutineDef, CheckFolderExists,
+	//check to see if folder exists
+	[VarSet, folderCheck, [StrMerge,GoZPath,"/GoZProjects"]]
+	[VarSet,folderExists,[FileExecute,[Var,dllPath],"FolderExists",#folderCheck]]
+	[If,folderExists,
+	,//else
+		[Note,"Cannot locate GoZ data folders",,3]
+		[Note,"Please locate the Pixologic folder that is usually located within the Users/Public/ folder",,3]
+		[RoutineCall, ChooseFolder]
+		[VarSet, GoZPath, folderPath]
+	]
+]
+[RoutineCall, CheckFolderExists]
+//Save the chosen folder to settings file
+[varSave, folderPath, "GoB_Import_Settings.svr"]
+
+[RoutineDef, SecondCheck,
+	//check to see if folder exists
+	[VarSet, folderCheck, [StrMerge,GoZPath,"/GoZProjects"]]
+	[VarSet,folderExists,[FileExecute,[Var,dllPath],"FolderExists",#folderCheck]]
+	[If,folderExists,
+	,//else
+		[Note,"Still cannot locate GoZ data, aborting zscript...",,3]
+		[Exit]
+	]
+]
+[RoutineCall, SecondCheck]
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+//~~~GoB Main
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 [If,GoBImport==1,               //make sure this script runs when loaded
     [RoutineDef,AdjustPath,     //replace backslashes with forward slashes
@@ -45,20 +185,20 @@ author: Daniel Grauer
     ,path]
 
     //[VarSet,publicPath,[FileNameExtract,[FileNameResolvePath,"ZPUBLIC_ZPluginData/"],1]]
-    [VarSet,publicPath,"C:/Users/Public/Pixologic/"]
+    [VarSet,publicPath,GoZPath]
     [VarSet,publicPathMac,"Users/Shared/Pixologic/"]
     [RoutineCall,AdjustPath,publicPath]         //just as Notes don't display backslashes!
-    [Note,[StrMerge, "\nThe ZBrush Data folder path is: \n    ", publicPath],,reportDuration]
+    //[Note,[StrMerge, "\nThe ZBrush Data folder path is: \n    ", publicPath],,reportDuration]
 
     [VarDef,GoZProjectsPath,""]
     [VarDef, GoZBrushPath, ""]
 	[If,[ZBrushInfo,6],//is MacOS
 	 	[If,[StrFind,"Pixologic",publicPath]>-1,
 		 	//[VarSet,GoZProjectsPath,[StrExtract,publicPath,0,([StrFind,"Users",publicPath]+5)]]
-		 	[VarSet,GoZProjectsPath,[StrMerge,publicPathMac,"GoZProjects/Default/"]]
+		 	[VarSet,GoZProjectsPath,[StrMerge,publicPathMac,"/GoZProjects/Default/"]]
 
 		 	//[VarSet,GoZBrushPath,[StrExtract,publicPath,0,([StrFind,"Users",publicPath]+5)]]
-		 	[VarSet,GoZBrushPath,[StrMerge,publicPathMac,"GoZBrush/"]]
+		 	[VarSet,GoZBrushPath,[StrMerge,publicPathMac,"/GoZBrush/"]]
 
             //[Note,[StrMerge, "\nThe GoZ Projects path is: \n    ", GoZProjectsPath],,reportDuration]
             //[Note,[StrMerge, "\nThe GoZ objects list path is: \n    ", GoZBrushPath],,reportDuration]
@@ -69,18 +209,17 @@ author: Daniel Grauer
          ,//else Windows
 		 [If,[StrFind,"Pixologic",publicPath]>-1,
 		 	//[VarSet,GoZProjectsPath,[StrExtract,publicPath,0,([StrFind,"C",publicPath]+3)]]
-		 	[VarSet,GoZProjectsPath,[StrMerge,publicPath,"GoZProjects/Default/"]]
+		 	[VarSet,GoZProjectsPath,[StrMerge,publicPath,"/GoZProjects/Default/"]]
 		 	[RoutineCall,AdjustPath,GoZProjectsPath]//just as Notes don't display backslashes!
 
 		 	//[VarSet,GoZBrushPath,[StrExtract,publicPath,0,([StrFind,"Users",publicPath]+0)]]
-		 	[VarSet,GoZBrushPath,[StrMerge,publicPath,"GoZBrush/"]]
+		 	[VarSet,GoZBrushPath,[StrMerge,publicPath,"/GoZBrush/"]]
 		 	[RoutineCall,AdjustPath,GoZBrushPath]//just as Notes don't display backslashes!
 
-            [Note,[StrMerge, "\nThe GoZ Projects path is: \n    ", GoZProjectsPath],,reportDuration]
-            [Note,[StrMerge, "\nThe GoZ objects list path is: \n    ", GoZBrushPath],,reportDuration]
+            //[Note,[StrMerge, "\nThe GoZ Projects path is: \n    ", GoZProjectsPath],,reportDuration]
+            //[Note,[StrMerge, "\nThe GoZ objects list path is: \n    ", GoZBrushPath],,reportDuration]
 		 ]
 	]
-
 
     [VarDef,variablesFile,[StrMerge,GoZProjectsPath,"GoB_variables.zvr"]]  
     // load variables from GoB export
@@ -107,7 +246,7 @@ author: Daniel Grauer
         [Note,[StrMerge,"\n\nGoB_variables.zvr not Found", "\naborting import"],,reportDuration]
         [Exit]
     ]   
-    [Note,[StrMerge, "\CFFFFFFGoB Version: ",gobVersion, "\n"],,reportDuration]
+    //[Note,[StrMerge, "\CFFFFFFGoB Version: ",gobVersion, "\n"],,reportDuration]
        
 
     [RoutineDef,LoadTextures,
@@ -118,17 +257,17 @@ author: Daniel Grauer
         [If,[FileExists,diffTexture],
             [IPress,Tool:Texture Map:TextureMap]
             [FileNameSetNext,diffTexture] [IPress,Texture:Import]
-            [Note, [StrMerge, "\n   Texture:   ", [StrMerge,objectName,diffSuffix,textureFormat]],, reportDuration]
+            //[Note, [StrMerge, "\n   Texture:   ", [StrMerge,objectName,diffSuffix,textureFormat]],, reportDuration]
         ]
         [If,[FileExists,dispTexture],
             [IPress,Tool:Displacement Map:DisplacementMap]
             [FileNameSetNext,dispTexture] [IPress,Alpha:Import]
-            [Note, [StrMerge, "\n   Texture:   ", [StrMerge,objectName,dispSuffix,textureFormat]],, reportDuration]
+            //[Note, [StrMerge, "\n   Texture:   ", [StrMerge,objectName,dispSuffix,textureFormat]],, reportDuration]
         ]
         [If,[FileExists,normTexture],            
             [IPress,Tool:Normal Map:Normal Map]
             [FileNameSetNext,normTexture] [IPress,Texture:Import]
-            [Note, [StrMerge, "\n   Texture:   ", [StrMerge,objectName,dispSuffix,textureFormat]],, reportDuration]
+            //[Note, [StrMerge, "\n   Texture:   ", [StrMerge,objectName,dispSuffix,textureFormat]],, reportDuration]
         ]
     ]
 
@@ -260,7 +399,7 @@ author: Daniel Grauer
         [TransformGet, xPos, yPos, zPos, xSc, ySc, zSc, xRot, yRot, zRot ]
         [TransformSet, (Document:Width/2), (Document:Height/2), zPos,  xSc, ySc, zSc, xRot, yRot, zRot]
         
-        [Note,[StrMerge, "\n\C00FF00 Created new tool: ",  objectName],,reportDuration]
+        //[Note,[StrMerge, "\n\C00FF00 Created new tool: ",  objectName],,reportDuration]
     , objectName, objectPath]
 
 
@@ -291,7 +430,7 @@ author: Daniel Grauer
             ] 
         ]    
         
-        [Note,[StrMerge,"\n\C2200FF Created new Subtool:      \CFFFFFF", objectName] ,,reportDuration]
+        //[Note,[StrMerge,"\n\C2200FF Created new Subtool:      \CFFFFFF", objectName] ,,reportDuration]
     , objectName, objectPath]
 
 
@@ -303,7 +442,7 @@ author: Daniel Grauer
             [IPress,Tool:Import]                        
             [RoutineCall, LoadTextures]    
         ]         
-        [Note,[StrMerge,"\n\CFFEE00 Updated Subtool:    \CFFFFFF",objectName],,reportDuration]  
+        //[Note,[StrMerge,"\n\CFFEE00 Updated Subtool:    \CFFFFFF",objectName],,reportDuration]  
     , objectName, objectPath, subtoolCount]
 
 
@@ -396,57 +535,3 @@ author: Daniel Grauer
         ]
     ]
 ]/*End of ZScript*/
-
-
-
-
-
-//[SubToolGetFolderName,4] //return the folder name that the 5th subtool was in, or an empty string if it wasn’t in a folder.
-// [SubtoolGetFolderIndex] 
-
-/* 
-[IButton, “Subtool visible?”, ,
-[VarSet,STStatus,[SubtoolGetStatus]]
-[VarSet,STFolderIndex,[SubtoolGetFolderIndex]]
-
-[If,(STFolderIndex > -1), //part of a folder
-    [If,(STStatus&2), //head of the folder
-        [If,(STStatus&1),
-            [Note,“Visible head of folder”]
-        ,
-            [Note,“Invisible head of folder”] ]
-        ,
-        [If,(STStatus&1), //member of the folder
-            [Note,“Visible in a folder”]
-        ,
-            [Note,“Invisible in a folder”] ] ] ] [If,(STFolderIndex == -1), //not part of a folder
-            [If,(STStatus&1),
-                [Note,“Visible”]
-            ,
-                [Note,“Invisible”]
-        ]
-    ]
-] 
-*/
-
-
-
-/* 
-[RoutineDef, SubToolIsVisible,
-    [VarSet, isVisible, 0]
-    [VarSet,actIndex,[SubToolGetActiveIndex]]
-    [VarSet,st,[subtoolgetstatus,actIndex]]
-    [VarSet,fInd,[subtoolgetfolderindex,actIndex]]
-    
-    [If,(fInd > -1),//it’s in a folder
-        [VarSet,stFld,[subtoolgetstatus,fInd]]//get folder visibility
-        [If,([Val,stFld]&0x2 == 0x2)&&([Val,st]&0x1 == 0x1),
-            [VarSet,isVisible,1]
-        ]
-        , //else no folder
-            [If,([Val,st]&0x1 == 0x1),
-            [VarSet,isVisible,1]
-        ]
-    ]
-, isVisible] 
-*/
