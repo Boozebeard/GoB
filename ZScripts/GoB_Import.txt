@@ -1,10 +1,9 @@
-﻿//ZFileUtils test zscript for ZBrush 2021 by Marcus Civis & Xavier Durand - updated November 2020
-//The ZFileUtils64.dll and ZFileUtils.lib 
-//are provided 'as is' with no warranty of any kind - use at your own risk!
-
-//load this file through the ZScript:Load button
-//a new "ZFileUtilsTests" sub-palette will appear in the Zplugin pallette
-
+﻿/*
+name: GoB_Import.zsc 
+description: Zbrush script for Blender GoB addon
+tracker_url: https://github.com/JoseConseco/GoB
+author: Daniel Grauer
+*/
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 //~~~VARIABLES
@@ -19,7 +18,7 @@
 [VarDef, folderPath,""]
 [VarDef, GoZPath,""]
 [VarDef, defaultPath, "C:/Users/Public/Pixologic"]
-[VarDef, dafaultPathMac,"Users/Shared/Pixologic"]
+[VarDef, defaultPathMac,"Users/Shared/Pixologic"]
 
 [VarDef,GoBImport,1]        
 [VarDef,reportDuration,0]      //Display Duration (in seconds) (0:wait for user action(default), -1:combine with next note command),
@@ -144,9 +143,11 @@
 	]
 ]
 [RoutineCall, CheckFolderExists]
-//Save the chosen folder to settings file
+
+//Save the chosen folder path to settings file
 [varSave, folderPath, "GoB_Import_Settings.svr"]
 
+//Check  if the folder selected by the user is valid, if not abort script.
 [RoutineDef, SecondCheck,
 	//check to see if folder exists
 	[VarSet, folderCheck, [StrMerge,GoZPath,"/GoZProjects"]]
@@ -186,7 +187,7 @@
 
     //[VarSet,publicPath,[FileNameExtract,[FileNameResolvePath,"ZPUBLIC_ZPluginData/"],1]]
     [VarSet,publicPath,GoZPath]
-    [VarSet,publicPathMac,"Users/Shared/Pixologic/"]
+    [VarSet,publicPathMac,defaultPathMac]
     [RoutineCall,AdjustPath,publicPath]         //just as Notes don't display backslashes!
     //[Note,[StrMerge, "\nThe ZBrush Data folder path is: \n    ", publicPath],,reportDuration]
 
@@ -194,10 +195,8 @@
     [VarDef, GoZBrushPath, ""]
 	[If,[ZBrushInfo,6],//is MacOS
 	 	[If,[StrFind,"Pixologic",publicPath]>-1,
-		 	//[VarSet,GoZProjectsPath,[StrExtract,publicPath,0,([StrFind,"Users",publicPath]+5)]]
 		 	[VarSet,GoZProjectsPath,[StrMerge,publicPathMac,"/GoZProjects/Default/"]]
 
-		 	//[VarSet,GoZBrushPath,[StrExtract,publicPath,0,([StrFind,"Users",publicPath]+5)]]
 		 	[VarSet,GoZBrushPath,[StrMerge,publicPathMac,"/GoZBrush/"]]
 
             //[Note,[StrMerge, "\nThe GoZ Projects path is: \n    ", GoZProjectsPath],,reportDuration]
@@ -208,11 +207,9 @@
 	 	
          ,//else Windows
 		 [If,[StrFind,"Pixologic",publicPath]>-1,
-		 	//[VarSet,GoZProjectsPath,[StrExtract,publicPath,0,([StrFind,"C",publicPath]+3)]]
 		 	[VarSet,GoZProjectsPath,[StrMerge,publicPath,"/GoZProjects/Default/"]]
 		 	[RoutineCall,AdjustPath,GoZProjectsPath]//just as Notes don't display backslashes!
 
-		 	//[VarSet,GoZBrushPath,[StrExtract,publicPath,0,([StrFind,"Users",publicPath]+0)]]
 		 	[VarSet,GoZBrushPath,[StrMerge,publicPath,"/GoZBrush/"]]
 		 	[RoutineCall,AdjustPath,GoZBrushPath]//just as Notes don't display backslashes!
 
@@ -535,3 +532,53 @@
         ]
     ]
 ]/*End of ZScript*/
+
+//[SubToolGetFolderName,4] //return the folder name that the 5th subtool was in, or an empty string if it wasn’t in a folder.
+// [SubtoolGetFolderIndex] 
+
+/* 
+[IButton, “Subtool visible?”, ,
+[VarSet,STStatus,[SubtoolGetStatus]]
+[VarSet,STFolderIndex,[SubtoolGetFolderIndex]]
+
+[If,(STFolderIndex > -1), //part of a folder
+    [If,(STStatus&2), //head of the folder
+        [If,(STStatus&1),
+            [Note,“Visible head of folder”]
+        ,
+            [Note,“Invisible head of folder”] ]
+        ,
+        [If,(STStatus&1), //member of the folder
+            [Note,“Visible in a folder”]
+        ,
+            [Note,“Invisible in a folder”] ] ] ] [If,(STFolderIndex == -1), //not part of a folder
+            [If,(STStatus&1),
+                [Note,“Visible”]
+            ,
+                [Note,“Invisible”]
+        ]
+    ]
+] 
+*/
+
+
+
+/* 
+[RoutineDef, SubToolIsVisible,
+    [VarSet, isVisible, 0]
+    [VarSet,actIndex,[SubToolGetActiveIndex]]
+    [VarSet,st,[subtoolgetstatus,actIndex]]
+    [VarSet,fInd,[subtoolgetfolderindex,actIndex]]
+    
+    [If,(fInd > -1),//it’s in a folder
+        [VarSet,stFld,[subtoolgetstatus,fInd]]//get folder visibility
+        [If,([Val,stFld]&0x2 == 0x2)&&([Val,st]&0x1 == 0x1),
+            [VarSet,isVisible,1]
+        ]
+        , //else no folder
+            [If,([Val,st]&0x1 == 0x1),
+            [VarSet,isVisible,1]
+        ]
+    ]
+, isVisible] 
+*/
