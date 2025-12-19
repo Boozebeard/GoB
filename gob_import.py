@@ -211,7 +211,7 @@ class GoB_OT_import(Operator):
                 # Polygroups
                 elif tag == b'\x41\x9c\x00\x00': 
                     if utils.prefs().debug_output:
-                        print("__ Polyroups: TEST", tag) 
+                        print("__ Polyroups:", tag) 
                     break
                 # End
                 elif tag == b'\x00\x00\x00\x00':  
