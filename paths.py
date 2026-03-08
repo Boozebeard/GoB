@@ -45,7 +45,7 @@ def gob_init_os_paths():
 
         isMacOS = True        
         #print(os.path.isfile("/Users/Shared/Pixologic/GoZBrush/GoZBrushFromApp.app/Contents/MacOS/GoZBrushFromApp"))
-        PATH_GOZ = os.path.join("Users", "Shared", "Pixologic")
+        PATH_GOZ = os.path.join("/", "Users", "Shared", "Pixologic")
     else:
         print("GoB Unkonwn System: ", platform.system())
         PATH_GOZ = False ## NOTE: GOZ seems to be missing, reinstall from zbrush

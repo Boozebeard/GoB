@@ -65,7 +65,7 @@ class GoB_Preferences(AddonPreferences):
     if platform.system() == 'Windows':
         PATH_GOZ = os.path.join(os.environ['PUBLIC'] , "Pixologic")
     elif platform.system() == 'Darwin': #osx
-        PATH_GOZ = os.path.join("Users", "Shared", "Pixologic")
+        PATH_GOZ = os.path.join("/", "Users", "Shared", "Pixologic")
     else:
         PATH_GOZ = False
 
